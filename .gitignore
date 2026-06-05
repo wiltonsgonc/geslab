@@ -1,0 +1,40 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+*.userprefs
+*.csproj.user
+.vs/
+node_modules/
+
+## Build
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio
+.visualstudio/
+*.VisualState.xml
+.vscode/
+
+## JetBrains Rider
+.idea/
+*.sln.iml
+
+## Docker
+docker-compose.override.yml
+
+## Secrets
+appsettings.*.local.json
+.env

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LabScheduler.Api/LabScheduler.Api.csproj" />
+    <Project Path="src/LabScheduler.Domain/LabScheduler.Domain.csproj" />
+    <Project Path="src/LabScheduler.Infrastructure/LabScheduler.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/LabScheduler.Web/">
+    <Project Path="src/LabScheduler.Web/LabScheduler.Web.Client/LabScheduler.Web.Client.csproj" />
+    <Project Path="src/LabScheduler.Web/LabScheduler.Web/LabScheduler.Web.csproj" />
+  </Folder>
+</Solution>
