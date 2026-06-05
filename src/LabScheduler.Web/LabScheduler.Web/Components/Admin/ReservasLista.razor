@@ -1,0 +1,118 @@
+@page "/admin/reservas"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.ApiClient Api
+
+<PageTitle>Gerenciar Reservas</PageTitle>
+
+<h3 class="mb-3">Reservas</h3>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <input type="date" class="form-control" value="@filtroData?.ToString("yyyy-MM-dd")" @onchange="OnDataChanged" />
+    </div>
+    <div class="col-md-8 text-end">
+        <a href="/nova-reserva" class="btn btn-primary">+ Nova Reserva</a>
+    </div>
+</div>
+
+@if (reservas.Count == 0)
+{
+    <p class="text-muted">Nenhuma reserva encontrada.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead class="table-light">
+                <tr>
+                    <th>Data</th>
+                    <th>Horário</th>
+                    <th>Solicitante</th>
+                    <th>Instituição</th>
+                    <th>Equipamentos</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in reservas)
+                {
+                    <tr>
+                        <td>@r.DataReserva.ToString("dd/MM/yyyy")</td>
+                        <td>@r.HoraInicio.ToString(@"hh\:mm") - @r.HoraFim.ToString(@"hh\:mm")</td>
+                        <td><strong>@r.NomeSolicitante</strong><br /><small class="text-muted">@r.EmailSolicitante</small></td>
+                        <td>@r.InstituicaoEmpresa</td>
+                        <td>@string.Join(", ", r.Equipamentos.Select(e => e.NomeEquipamento))</td>
+                        <td><span class="badge @StatusBadge(r.Status)">@r.Status</span></td>
+                        <td>
+                            @if (r.Status == "Pendente" || r.Status == "Confirmada")
+                            {
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => Iniciar(r.Id)">Iniciar</button>
+                            }
+                            @if (r.Status == "EmAndamento")
+                            {
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Concluir(r.Id)">Concluir</button>
+                            }
+                            @if (r.Status != "Cancelada" && r.Status != "Concluida")
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => Cancelar(r.Id)">Cancelar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Reserva> reservas = new();
+    private DateTime? filtroData;
+
+    private async Task Iniciar(Guid id) => await AlterarStatus(id, StatusEmAndamento);
+    private async Task Concluir(Guid id) => await AlterarStatus(id, StatusConcluida);
+    private async Task Cancelar(Guid id) => await AlterarStatus(id, StatusCancelada);
+
+    private const string StatusEmAndamento = "EmAndamento";
+    private const string StatusConcluida = "Concluida";
+    private const string StatusCancelada = "Cancelada";
+
+    private async Task OnDataChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+            filtroData = dt;
+        else
+            filtroData = null;
+        await Carregar();
+    }
+
+    protected override async Task OnInitializedAsync() => await Carregar();
+
+    private async Task Carregar()
+    {
+        try { reservas = await Api.GetReservasAsync(filtroData); }
+        catch { }
+    }
+
+    private async Task AlterarStatus(Guid id, string status)
+    {
+        try
+        {
+            await Api.UpdateReservaStatusAsync(id, status);
+            await Carregar();
+        }
+        catch { }
+    }
+
+    private static string StatusBadge(string status) => status switch
+    {
+        "Confirmada" => "bg-success",
+        "Pendente" => "bg-warning text-dark",
+        "Cancelada" => "bg-danger",
+        "Concluida" => "bg-secondary",
+        "EmAndamento" => "bg-info text-dark",
+        "NaoCompareceu" => "bg-dark",
+        _ => "bg-secondary"
+    };
+}

@@ -1,0 +1,92 @@
+@page "/admin"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.ApiClient Api
+
+<PageTitle>Dashboard Administrativo</PageTitle>
+
+<h3 class="mb-4">Dashboard</h3>
+
+@if (dashboard == null)
+{
+    <p class="text-muted">Carregando...</p>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-primary">@dashboard.TotalReservasHoje</h5>
+                    <p class="card-text text-muted small">Reservas Hoje</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success">@dashboard.TotalReservasSemana</h5>
+                    <p class="card-text text-muted small">Reservas na Semana</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-warning">@dashboard.ReservasPendentes</h5>
+                    <p class="card-text text-muted small">Reservas Pendentes</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-danger">@dashboard.InsumosEstoqueBaixo</h5>
+                    <p class="card-text text-muted small">Insumos Estoque Baixo</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">@dashboard.EquipamentosDisponiveis / @dashboard.EquipamentosTotal</h5>
+                    <p class="card-text text-muted small">Equipamentos Disponíveis</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">@dashboard.InsumosTotal</h5>
+                    <p class="card-text text-muted small">Total de Insumos</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <h5>Acesso Rápido</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="/admin/equipamentos" class="btn btn-outline-primary">Gerenciar Equipamentos</a>
+                <a href="/admin/insumos" class="btn btn-outline-primary">Gerenciar Insumos</a>
+                <a href="/admin/movimentos" class="btn btn-outline-primary">Movimentos de Estoque</a>
+                <a href="/admin/alertas" class="btn btn-outline-danger">Alertas de Estoque</a>
+                <a href="/admin/reservas" class="btn btn-outline-primary">Gerenciar Reservas</a>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Dashboard? dashboard;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { dashboard = await Api.GetDashboardAsync(); }
+        catch { dashboard = new(); }
+    }
+}

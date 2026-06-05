@@ -1,0 +1,136 @@
+@page "/admin/alertas"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.ApiClient Api
+
+<PageTitle>Alertas de Estoque</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Alertas de Estoque</h3>
+    <div>
+        <button class="btn btn-outline-secondary btn-sm @GetBtnClass(null)" @onclick="FiltrarTodos">Todos</button>
+        <button class="btn btn-outline-warning btn-sm @GetBtnClass(Ativo)" @onclick="FiltrarAtivos">Ativos</button>
+        <button class="btn btn-outline-success btn-sm @GetBtnClass(Resolvido)" @onclick="FiltrarResolvidos">Resolvidos</button>
+    </div>
+</div>
+
+@if (alertas.Count == 0)
+{
+    <div class="alert alert-info">Nenhum alerta encontrado.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table">
+            <thead class="table-light">
+                <tr>
+                    <th>Data</th>
+                    <th>Insumo</th>
+                    <th>Mensagem</th>
+                    <th>Qtd. Atual</th>
+                    <th>Qtd. Mínima</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var alerta in alertas)
+                {
+                    <tr class="@(alerta.Status == "Ativo" ? "table-danger" : "")">
+                        <td>@alerta.CreatedAt.ToString("dd/MM/yyyy")</td>
+                        <td><strong>@alerta.NomeInsumo</strong></td>
+                        <td>@alerta.Mensagem</td>
+                        <td>@alerta.QuantidadeAtual.ToString("N2")</td>
+                        <td>@alerta.QuantidadeMinima.ToString("N2")</td>
+                        <td>
+                            <span class="badge @(alerta.Status == "Ativo" ? "bg-danger" : "bg-success")">
+                                @alerta.Status
+                            </span>
+                        </td>
+                        <td>
+                            @if (alerta.Status == "Ativo")
+                            {
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => Resolver(alerta)">
+                                    Resolver
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (resolvendoAlerta != null)
+{
+    <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Resolver Alerta</h5>
+                    <button type="button" class="btn-close" @onclick="() => resolvendoAlerta = null"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>@resolvendoAlerta.NomeInsumo</strong></p>
+                    <p>@resolvendoAlerta.Mensagem</p>
+                    <div class="mb-3">
+                        <label class="form-label">Ação tomada</label>
+                        <textarea class="form-control" @bind="acaoTomada" rows="2" placeholder="Ex: Compra realizada em 05/06"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Responsável</label>
+                        <input type="text" class="form-control" @bind="responsavel" placeholder="Nome do responsável" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-success" @onclick="ConfirmarResolucao">Confirmar Resolução</button>
+                    <button class="btn btn-outline-secondary" @onclick="() => resolvendoAlerta = null">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const string Ativo = "Ativo";
+    private const string Resolvido = "Resolvido";
+    private List<AlertaEstoque> alertas = new();
+    private string? filtro;
+    private AlertaEstoque? resolvendoAlerta;
+    private string? acaoTomada;
+    private string? responsavel;
+
+    protected override async Task OnInitializedAsync() => await Carregar();
+
+    private string GetBtnClass(string? val) => filtro == val ? "active" : "";
+
+    private async Task FiltrarTodos() { filtro = null; await Carregar(); }
+    private async Task FiltrarAtivos() { filtro = Ativo; await Carregar(); }
+    private async Task FiltrarResolvidos() { filtro = Resolvido; await Carregar(); }
+
+    private async Task Carregar()
+    {
+        try { alertas = await Api.GetAlertasAsync(filtro); }
+        catch { }
+    }
+
+    private void Resolver(AlertaEstoque alerta)
+    {
+        resolvendoAlerta = alerta;
+        acaoTomada = "";
+        responsavel = "";
+    }
+
+    private async Task ConfirmarResolucao()
+    {
+        if (resolvendoAlerta == null) return;
+        try
+        {
+            await Api.ResolverAlertaAsync(resolvendoAlerta.Id, acaoTomada, responsavel);
+            resolvendoAlerta = null;
+            await Carregar();
+        }
+        catch { }
+    }
+}

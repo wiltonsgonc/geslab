@@ -1,0 +1,204 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.ApiClient Api
+
+<PageTitle>LabScheduler - Agendamento</PageTitle>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-0">Calendário de Reservas</h2>
+        <p class="text-muted">Selecione um dia para visualizar ou criar reservas</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <button class="btn btn-outline-secondary btn-sm" @onclick="MesAnterior">&laquo; Anterior</button>
+                <strong>@NomeMes @anoAtual</strong>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ProximoMes">Próximo &raquo;</button>
+            </div>
+            <div class="card-body p-2">
+                <table class="table table-bordered mb-0 text-center calendario">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Dom</th><th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th>Sáb</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int s = 0; s < 6; s++)
+                        {
+                            <tr>
+                                @for (int d = 0; d < 7; d++)
+                                {
+                                    var dia = ObterDia(s, d);
+                                    <td class="@ClasseDia(dia)" @onclick="() => SelecionarDia(dia)" role="button">
+                                        @if (dia.HasValue)
+                                        {
+                                            <span class="dia-numero">@dia.Value.Day</span>
+                                            if (reservasDoDia.ContainsKey(dia.Value))
+                                            {
+                                                <span class="badge bg-primary d-block mt-1">@reservasDoDia[dia.Value] reserva(s)</span>
+                                            }
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <strong>@(diaSelecionado.HasValue ? diaSelecionado.Value.ToString("dd/MM/yyyy") : "Nenhum dia selecionado")</strong>
+            </div>
+            <div class="card-body">
+                @if (diaSelecionado.HasValue)
+                {
+                    if (reservasCarregadas.Count > 0)
+                    {
+                        <h6>Reservas do dia:</h6>
+                        <div class="list-group list-group-flush">
+                            @foreach (var r in reservasCarregadas)
+                            {
+                                <div class="list-group-item list-group-item-action px-0">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <small class="fw-bold">@r.HoraInicio.ToString(@"hh\:mm") - @r.HoraFim.ToString(@"hh\:mm")</small>
+                                        <span class="badge @StatusBadge(r.Status)">@r.Status</span>
+                                    </div>
+                                    <small>@r.NomeSolicitante</small>
+                                    @if (!string.IsNullOrEmpty(r.InstituicaoEmpresa))
+                                    {
+                                        <small class="d-block text-muted">@r.InstituicaoEmpresa</small>
+                                    }
+                                    @if (r.Equipamentos.Count > 0)
+                                    {
+                                        <small class="d-block text-muted">@string.Join(", ", r.Equipamentos)</small>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-2">Nenhuma reserva neste dia.</p>
+                    }
+
+                    <a href="/nova-reserva?data=@diaSelecionado.Value.ToString("yyyy-MM-dd")" class="btn btn-primary w-100 mt-2">
+                        Nova Reserva
+                    </a>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">Clique em um dia no calendário para ver as reservas.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .calendario td { cursor: pointer; height: 80px; width: 14%; vertical-align: top; padding: 4px; }
+    .calendario td:hover { background-color: #f0f0f0; }
+    .calendario td.selecionado { background-color: #cfe2ff; }
+    .calendario td.fora-mes { color: #ccc; }
+    .calendario td.hoje { background-color: #e8f5e9; }
+    .dia-numero { font-weight: 600; font-size: 1.1em; }
+</style>
+
+@code {
+    private int mesAtual = DateTime.Now.Month;
+    private int anoAtual = DateTime.Now.Year;
+    private DateTime? diaSelecionado;
+    private DateTime primeiroDiaMes;
+    private int diasNoMes;
+    private int diaSemanaInicio;
+    private Dictionary<DateTime, int> reservasDoDia = new();
+    private List<ReservaCalendario> reservasCarregadas = new();
+
+    private static readonly string[] meses = { "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro" };
+    private string NomeMes => meses[mesAtual - 1];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarMes();
+    }
+
+    private async Task CarregarMes()
+    {
+        primeiroDiaMes = new DateTime(anoAtual, mesAtual, 1);
+        diasNoMes = DateTime.DaysInMonth(anoAtual, mesAtual);
+        diaSemanaInicio = (int)primeiroDiaMes.DayOfWeek;
+
+        var inicio = primeiroDiaMes;
+        var fim = new DateTime(anoAtual, mesAtual, diasNoMes);
+
+        var reservas = await Api.GetCalendarioAsync(inicio, fim);
+        reservasDoDia = reservas
+            .GroupBy(r => r.DataReserva.Date)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        if (diaSelecionado.HasValue && diaSelecionado.Value.Month == mesAtual)
+        {
+            await CarregarReservasDia(diaSelecionado.Value);
+        }
+    }
+
+    private async Task SelecionarDia(DateTime? dia)
+    {
+        if (!dia.HasValue) return;
+        diaSelecionado = dia.Value;
+        await CarregarReservasDia(dia.Value);
+    }
+
+    private async Task CarregarReservasDia(DateTime dia)
+    {
+        reservasCarregadas = await Api.GetCalendarioAsync(dia, dia);
+    }
+
+    private DateTime? ObterDia(int semana, int diaSemana)
+    {
+        int dia = (semana * 7) + diaSemana - diaSemanaInicio + 1;
+        if (dia < 1 || dia > diasNoMes) return null;
+        return new DateTime(anoAtual, mesAtual, dia);
+    }
+
+    private string ClasseDia(DateTime? dia)
+    {
+        if (dia == null) return "fora-mes";
+        var classes = new List<string>();
+        if (dia.Value.Date == DateTime.Today) classes.Add("hoje");
+        if (diaSelecionado.HasValue && dia.Value.Date == diaSelecionado.Value.Date) classes.Add("selecionado");
+        return string.Join(" ", classes);
+    }
+
+    private async Task MesAnterior()
+    {
+        mesAtual--;
+        if (mesAtual < 1) { mesAtual = 12; anoAtual--; }
+        await CarregarMes();
+    }
+
+    private async Task ProximoMes()
+    {
+        mesAtual++;
+        if (mesAtual > 12) { mesAtual = 1; anoAtual++; }
+        await CarregarMes();
+    }
+
+    private static string StatusBadge(string status) => status switch
+    {
+        "Confirmada" => "bg-success",
+        "Pendente" => "bg-warning text-dark",
+        "Cancelada" => "bg-danger",
+        "Concluida" => "bg-secondary",
+        "EmAndamento" => "bg-info text-dark",
+        _ => "bg-secondary"
+    };
+}

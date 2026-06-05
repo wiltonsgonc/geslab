@@ -1,0 +1,190 @@
+@page "/admin/equipamentos"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.ApiClient Api
+
+<PageTitle>Gerenciar Equipamentos</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Equipamentos</h3>
+    <button class="btn btn-primary" @onclick="NovoEquipamento">+ Novo Equipamento</button>
+</div>
+
+@if (exibirFormulario)
+{
+    <div class="card mb-4">
+        <div class="card-header">@(editando ? "Editar Equipamento" : "Novo Equipamento")</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Nome *</label>
+                    <InputText @bind-Value="form.Nome" class="form-control" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Nº Série</label>
+                    <InputText @bind-Value="form.NumeroSerie" class="form-control" />
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Descrição</label>
+                <InputTextArea @bind-Value="form.Descricao" class="form-control" rows="2" />
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Marca</label>
+                    <InputText @bind-Value="form.Marca" class="form-control" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Modelo</label>
+                    <InputText @bind-Value="form.Modelo" class="form-control" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Capacidade Diária</label>
+                    <InputNumber @bind-Value="form.CapacidadeDiaria" class="form-control" />
+                </div>
+            </div>
+            <div class="form-check mb-3">
+                <InputCheckbox @bind-Value="form.RequerTreinamento" class="form-check-input" />
+                <label class="form-check-label">Requer treinamento para uso</label>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Observações</label>
+                <InputTextArea @bind-Value="form.Observacoes" class="form-control" rows="2" />
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-success" @onclick="SalvarEquipamento">Salvar</button>
+                <button class="btn btn-outline-secondary" @onclick="CancelarEdicao">Cancelar</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (equipamentos.Count == 0)
+{
+    <p class="text-muted">Nenhum equipamento cadastrado.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>Marca / Modelo</th>
+                    <th>Nº Série</th>
+                    <th>Status</th>
+                    <th>Treinamento</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var eq in equipamentos)
+                {
+                    <tr>
+                        <td><strong>@eq.Nome</strong></td>
+                        <td>@eq.Marca @eq.Modelo</td>
+                        <td>@eq.NumeroSerie</td>
+                        <td><span class="badge @StatusBadge(eq.Status)">@eq.Status</span></td>
+                        <td>@(eq.RequerTreinamento ? "Sim" : "Não")</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(eq)">Editar</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(eq.Id)">Excluir</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Equipamento> equipamentos = new();
+    private bool exibirFormulario;
+    private bool editando;
+    private Guid editandoId;
+
+    private CreateEquipamento form = new();
+    private UpdateEquipamento updateForm = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Carregar();
+    }
+
+    private async Task Carregar()
+    {
+        try { equipamentos = await Api.GetEquipamentosAsync(); }
+        catch { }
+    }
+
+    private void NovoEquipamento()
+    {
+        form = new();
+        editando = false;
+        exibirFormulario = true;
+    }
+
+    private void Editar(Equipamento eq)
+    {
+        editando = true;
+        editandoId = eq.Id;
+        updateForm = new()
+        {
+            Nome = eq.Nome,
+            Descricao = eq.Descricao,
+            NumeroSerie = eq.NumeroSerie,
+            Marca = eq.Marca,
+            Modelo = eq.Modelo,
+            Status = eq.Status,
+            CapacidadeDiaria = eq.CapacidadeDiaria,
+            RequerTreinamento = eq.RequerTreinamento,
+            Observacoes = eq.Observacoes
+        };
+        exibirFormulario = true;
+    }
+
+    private void CancelarEdicao()
+    {
+        exibirFormulario = false;
+    }
+
+    private async Task SalvarEquipamento()
+    {
+        try
+        {
+            if (editando)
+            {
+                await Api.UpdateEquipamentoAsync(editandoId, updateForm);
+            }
+            else
+            {
+                await Api.CreateEquipamentoAsync(form);
+            }
+            exibirFormulario = false;
+            await Carregar();
+        }
+        catch (Exception ex)
+        {
+            // TODO: Mostrar erro
+        }
+    }
+
+    private async Task Excluir(Guid id)
+    {
+        try
+        {
+            await Api.DeleteEquipamentoAsync(id);
+            await Carregar();
+        }
+        catch { }
+    }
+
+    private static string StatusBadge(string status) => status switch
+    {
+        "Disponivel" => "bg-success",
+        "EmManutencao" => "bg-warning text-dark",
+        "Reservado" => "bg-info text-dark",
+        "Inativo" => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

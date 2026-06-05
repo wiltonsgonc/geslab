@@ -1,0 +1,219 @@
+@page "/admin/insumos"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Gerenciar Insumos</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Insumos</h3>
+    <button class="btn btn-primary" @onclick="NovoInsumo">+ Novo Insumo</button>
+</div>
+
+@if (exibirFormulario)
+{
+    <div class="card mb-4">
+        <div class="card-header">@(editando ? "Editar Insumo" : "Novo Insumo")</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Nome *</label>
+                    <InputText @bind-Value="form.Nome" class="form-control" />
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Categoria</label>
+                    <InputSelect @bind-Value="form.Categoria" class="form-select">
+                        <option value="Reagente">Reagente</option>
+                        <option value="Solvente">Solvente</option>
+                        <option value="Vidraria">Vidraria</option>
+                        <option value="EquipamentoProtecao">EPI</option>
+                        <option value="PadraoAnalitico">Padrão Analítico</option>
+                        <option value="Consumivel">Consumível</option>
+                        <option value="Outro">Outro</option>
+                    </InputSelect>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Unidade</label>
+                    <InputSelect @bind-Value="form.Unidade" class="form-select">
+                        <option value="Unidade">Unidade</option>
+                        <option value="Mililitro">mL</option>
+                        <option value="Litro">L</option>
+                        <option value="Grama">g</option>
+                        <option value="Miligrama">mg</option>
+                        <option value="Quilograma">kg</option>
+                        <option value="Mol">mol</option>
+                        <option value="Percentual">%</option>
+                    </InputSelect>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">CAS Number</label>
+                    <InputText @bind-Value="form.CasNumber" class="form-control" placeholder="Ex: 7732-18-5" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Fabricante</label>
+                    <InputText @bind-Value="form.Fabricante" class="form-control" />
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Descrição</label>
+                <InputTextArea @bind-Value="form.Descricao" class="form-control" rows="2" />
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Quantidade Atual</label>
+                    <InputNumber @bind-Value="form.QuantidadeAtual" class="form-control" step="0.01" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Qtd. Mínima (alerta)</label>
+                    <InputNumber @bind-Value="form.QuantidadeMinima" class="form-control" step="0.01" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Qtd. Máxima</label>
+                    <InputNumber @bind-Value="form.QuantidadeMaxima" class="form-control" step="0.01" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Localização</label>
+                    <InputText @bind-Value="form.Localizacao" class="form-control" placeholder="Ex: Armário A, Prateleira 3" />
+                </div>
+                <div class="col-md-6 mb-3 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox @bind-Value="form.Controlado" class="form-check-input" />
+                        <label class="form-check-label">Insumo Controlado</label>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Observações</label>
+                <InputTextArea @bind-Value="form.Observacoes" class="form-control" rows="2" />
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-success" @onclick="SalvarInsumo">Salvar</button>
+                <button class="btn btn-outline-secondary" @onclick="CancelarEdicao">Cancelar</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead class="table-light">
+            <tr>
+                <th>Nome</th>
+                <th>Categoria</th>
+                <th>Qtd. Atual</th>
+                <th>Qtd. Mínima</th>
+                <th>Unidade</th>
+                <th>Localização</th>
+                <th>Controlado</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var ins in insumos)
+            {
+                <tr class="@(ins.EstoqueBaixo ? "table-warning" : "")">
+                    <td><strong>@ins.Nome</strong></td>
+                    <td>@ins.Categoria</td>
+                    <td>@ins.QuantidadeAtual.ToString("N2")</td>
+                    <td>@ins.QuantidadeMinima.ToString("N2")</td>
+                    <td>@ins.Unidade</td>
+                    <td>@ins.Localizacao</td>
+                    <td>@(ins.Controlado ? "Sim" : "Não")</td>
+                    <td>
+                        @if (ins.EstoqueBaixo)
+                        {
+                            <span class="badge bg-danger">Baixo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">OK</span>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(ins)">Editar</button>
+                        <button class="btn btn-sm btn-outline-info" @onclick="() => VerMovimentos(ins)">Mov.</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => Excluir(ins.Id)">Excluir</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (insumos.Count == 0)
+{
+    <p class="text-muted">Nenhum insumo cadastrado.</p>
+}
+
+@code {
+    private List<Insumo> insumos = new();
+    private bool exibirFormulario;
+    private bool editando;
+    private Guid editandoId;
+
+    private CreateInsumo form = new();
+    private UpdateInsumo updateForm = new();
+
+    protected override async Task OnInitializedAsync() => await Carregar();
+
+    private async Task Carregar()
+    {
+        try { insumos = await Api.GetInsumosAsync(); }
+        catch { }
+    }
+
+    private void NovoInsumo()
+    {
+        form = new() { QuantidadeAtual = 0, QuantidadeMinima = 1 };
+        editando = false;
+        exibirFormulario = true;
+    }
+
+    private void Editar(Insumo ins)
+    {
+        editando = true;
+        editandoId = ins.Id;
+        updateForm = new()
+        {
+            Nome = ins.Nome, Descricao = ins.Descricao, CasNumber = ins.CasNumber,
+            Fabricante = ins.Fabricante, Categoria = ins.Categoria, Unidade = ins.Unidade,
+            QuantidadeAtual = ins.QuantidadeAtual, QuantidadeMinima = ins.QuantidadeMinima,
+            QuantidadeMaxima = ins.QuantidadeMaxima, Localizacao = ins.Localizacao,
+            Controlado = ins.Controlado, Observacoes = ins.Observacoes
+        };
+        exibirFormulario = true;
+    }
+
+    private void CancelarEdicao() => exibirFormulario = false;
+
+    private async Task SalvarInsumo()
+    {
+        try
+        {
+            if (editando)
+                await Api.UpdateInsumoAsync(editandoId, updateForm);
+            else
+                await Api.CreateInsumoAsync(form);
+            exibirFormulario = false;
+            await Carregar();
+        }
+        catch { }
+    }
+
+    private async Task Excluir(Guid id)
+    {
+        try { await Api.DeleteInsumoAsync(id); await Carregar(); }
+        catch { }
+    }
+
+    private void VerMovimentos(Insumo ins)
+    {
+        Navigation.NavigateTo($"/admin/movimentos?insumoId={ins.Id}");
+    }
+}

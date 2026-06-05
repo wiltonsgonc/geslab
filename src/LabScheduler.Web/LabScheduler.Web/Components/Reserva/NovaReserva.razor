@@ -1,0 +1,270 @@
+@page "/nova-reserva"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Nova Reserva</PageTitle>
+
+<h3 class="mb-3">Nova Reserva de Equipamento</h3>
+
+@if (mensagemErro != null)
+{
+    <div class="alert alert-danger">@mensagemErro</div>
+}
+
+@if (sucesso)
+{
+    <div class="alert alert-success">Reserva criada com sucesso!</div>
+    <a href="/" class="btn btn-primary">Voltar ao Calendário</a>
+    return;
+}
+
+<div class="row">
+    <div class="col-md-7">
+        <div class="card mb-3">
+            <div class="card-header"><strong>Dados do Solicitante</strong></div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Nome completo *</label>
+                    <InputText @bind-Value="model.NomeSolicitante" class="form-control" />
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">E-mail *</label>
+                        <InputText @bind-Value="model.EmailSolicitante" type="email" class="form-control" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Telefone</label>
+                        <InputText @bind-Value="model.TelefoneSolicitante" class="form-control" placeholder="(11) 99999-8888" />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Instituição / Empresa</label>
+                    <InputText @bind-Value="model.InstituicaoEmpresa" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Observações</label>
+                    <InputTextArea @bind-Value="model.Observacoes" class="form-control" rows="2" />
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><strong>Data e Horário</strong></div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Data *</label>
+                        <InputDate @bind-Value="model.DataReserva" class="form-control" />
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Início *</label>
+                        <input type="time" class="form-control" value="@model.HoraInicio.ToString(@"hh\:mm")" @onchange="OnHoraInicioChanged" />
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Fim *</label>
+                        <input type="time" class="form-control" value="@model.HoraFim.ToString(@"hh\:mm")" @onchange="OnHoraFimChanged" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Equipamentos</strong>
+                <span class="badge bg-primary">@model.EquipamentoIds.Count selecionado(s)</span>
+            </div>
+            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                @if (equipamentos.Count == 0)
+                {
+                    <p class="text-muted">Carregando equipamentos...</p>
+                }
+                @foreach (var eq in equipamentos)
+                {
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input"
+                            checked="@model.EquipamentoIds.Contains(eq.Id)"
+                            @onchange="e => ToggleEquipamento(eq.Id)" />
+                        <label class="form-check-label">
+                            <strong>@eq.Nome</strong>
+                            @if (!string.IsNullOrEmpty(eq.Marca) && !string.IsNullOrEmpty(eq.Modelo))
+                            {
+                                <small class="d-block text-muted">@eq.Marca - @eq.Modelo</small>
+                            }
+                        </label>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Insumos (opcional)</strong>
+                <span class="badge bg-info">@model.Insumos.Count item(ns)</span>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <select class="form-select form-select-sm" @bind="novoInsumoSelecionado">
+                        <option value="">Selecione um insumo...</option>
+                        @foreach (var ins in insumos)
+                        {
+                            <option value="@ins.Id">@ins.Nome (@ins.QuantidadeAtual @ins.Unidade)</option>
+                        }
+                    </select>
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="number" class="form-control" @bind="novaQuantidadeInsumo" placeholder="Qtd" step="0.01" min="0" />
+                    <button class="btn btn-outline-primary" @onclick="AdicionarInsumo" disabled="@string.IsNullOrEmpty(novoInsumoSelecionado)">Adicionar</button>
+                </div>
+                @if (model.Insumos.Count > 0)
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var item in model.Insumos)
+                        {
+                            var nome = insumos.Find(i => i.Id == item.InsumoId)?.Nome ?? "?";
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-1">
+                                <small>@nome</small>
+                                <div>
+                                    <small class="me-2">@item.QuantidadePrevista</small>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => model.Insumos.Remove(item)">&times;</button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex gap-2 mt-3">
+    <button class="btn btn-primary btn-lg" @onclick="CriarReserva" disabled="@carregando">
+        @(carregando ? "Salvando..." : "Confirmar Reserva")
+    </button>
+    <a href="/" class="btn btn-outline-secondary btn-lg">Cancelar</a>
+</div>
+
+@code {
+    private CreateReserva model = new();
+    private List<Equipamento> equipamentos = new();
+    private List<Insumo> insumos = new();
+    private string? mensagemErro;
+    private bool carregando;
+    private bool sucesso;
+
+    private string novoInsumoSelecionado = "";
+    private decimal novaQuantidadeInsumo = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+        var query = NavigationManagerExt.GetQueryString(Navigation.Uri);
+        if (query.TryGetValue("data", out var dataStr) && DateTime.TryParse(dataStr, out var data))
+        {
+            model.DataReserva = data;
+        }
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            equipamentos = await Api.GetEquipamentosAsync();
+            insumos = await Api.GetInsumosAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = $"Erro ao carregar dados: {ex.Message}";
+        }
+    }
+
+    private void OnHoraInicioChanged(ChangeEventArgs e)
+    {
+        if (TimeSpan.TryParse(e.Value?.ToString(), out var t))
+            model.HoraInicio = t;
+    }
+
+    private void OnHoraFimChanged(ChangeEventArgs e)
+    {
+        if (TimeSpan.TryParse(e.Value?.ToString(), out var t))
+            model.HoraFim = t;
+    }
+
+    private void ToggleEquipamento(Guid id)
+    {
+        if (model.EquipamentoIds.Contains(id))
+            model.EquipamentoIds.Remove(id);
+        else
+            model.EquipamentoIds.Add(id);
+    }
+
+    private void AdicionarInsumo()
+    {
+        if (string.IsNullOrEmpty(novoInsumoSelecionado) || novaQuantidadeInsumo <= 0) return;
+        var id = Guid.Parse(novoInsumoSelecionado);
+        if (!model.Insumos.Any(i => i.InsumoId == id))
+        {
+            model.Insumos.Add(new ReservaInsumoItem { InsumoId = id, QuantidadePrevista = novaQuantidadeInsumo });
+        }
+        novaQuantidadeInsumo = 1;
+        novoInsumoSelecionado = "";
+    }
+
+    private async Task CriarReserva()
+    {
+        mensagemErro = null;
+
+        if (string.IsNullOrWhiteSpace(model.NomeSolicitante))
+        { mensagemErro = "Informe o nome do solicitante."; return; }
+        if (string.IsNullOrWhiteSpace(model.EmailSolicitante))
+        { mensagemErro = "Informe o e-mail."; return; }
+        if (model.EquipamentoIds.Count == 0)
+        { mensagemErro = "Selecione ao menos um equipamento."; return; }
+        if (model.HoraInicio >= model.HoraFim)
+        { mensagemErro = "Horário de início deve ser anterior ao fim."; return; }
+
+        carregando = true;
+        try
+        {
+            await Api.CreateReservaAsync(model);
+            sucesso = true;
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = $"Erro ao criar reserva: {ex.Message}";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
+
+@using System.Web
+@code {
+    public static class NavigationManagerExt
+    {
+        public static Dictionary<string, string> GetQueryString(string uri)
+        {
+            var result = new Dictionary<string, string>();
+            if (uri.Contains('?'))
+            {
+                var query = uri[(uri.IndexOf('?') + 1)..];
+                foreach (var part in query.Split('&'))
+                {
+                    var eq = part.IndexOf('=');
+                    if (eq > 0)
+                    {
+                        var key = HttpUtility.UrlDecode(part[..eq]);
+                        var val = HttpUtility.UrlDecode(part[(eq + 1)..]);
+                        if (!string.IsNullOrEmpty(key)) result[key] = val;
+                    }
+                }
+            }
+            return result;
+        }
+    }
+}

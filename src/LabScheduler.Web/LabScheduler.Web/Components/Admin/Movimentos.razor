@@ -1,0 +1,216 @@
+@page "/admin/movimentos"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Movimentos de Estoque</PageTitle>
+
+<h3 class="mb-3">Movimentos de Estoque</h3>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <select class="form-select" value="@filtroInsumoId" @onchange="OnFiltroChanged">
+            <option value="">Todos os insumos</option>
+            @foreach (var ins in insumos)
+            {
+                <option value="@ins.Id">@ins.Nome</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-8 text-end">
+        <button class="btn btn-primary" @onclick="NovoMovimento">+ Novo Movimento</button>
+    </div>
+</div>
+
+@if (exibirFormulario)
+{
+    <div class="card mb-4">
+        <div class="card-header">Novo Movimento de Estoque</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Insumo *</label>
+                    <select class="form-select" value="@insumoSelecionado" @onchange="OnInsumoChanged">
+                        <option value="">Selecione...</option>
+                        @foreach (var ins in insumos)
+                        {
+                            <option value="@ins.Id">@ins.Nome (@ins.QuantidadeAtual.ToString("N2") @ins.Unidade disponível)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Tipo *</label>
+                    <select class="form-select" @bind="movForm.Tipo">
+                        <option value="Entrada">Entrada</option>
+                        <option value="Saida">Saída</option>
+                        <option value="Ajuste">Ajuste</option>
+                        <option value="Perda">Perda</option>
+                        <option value="Devolucao">Devolução</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Quantidade *</label>
+                    <input type="number" class="form-control" @bind="movForm.Quantidade" step="0.01" min="0" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Responsável</label>
+                    <input type="text" class="form-control" @bind="movForm.Responsavel" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Observação</label>
+                    <input type="text" class="form-control" @bind="movForm.Observacao" />
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-success" @onclick="SalvarMovimento" disabled="@string.IsNullOrEmpty(insumoSelecionado) || movForm.Quantidade <= 0">Salvar</button>
+                <button class="btn btn-outline-secondary" @onclick="() => exibirFormulario = false">Cancelar</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead class="table-light">
+            <tr>
+                <th>Data</th>
+                <th>Insumo</th>
+                <th>Tipo</th>
+                <th>Quantidade</th>
+                <th>Saldo Anterior</th>
+                <th>Saldo Posterior</th>
+                <th>Responsável</th>
+                <th>Observação</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var mov in movimentos)
+            {
+                <tr>
+                    <td>@mov.DataMovimento.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td><strong>@mov.NomeInsumo</strong></td>
+                    <td><span class="badge @TipoBadge(mov.Tipo)">@mov.Tipo</span></td>
+                    <td>@mov.Quantidade.ToString("N2")</td>
+                    <td>@mov.SaldoAnterior.ToString("N2")</td>
+                    <td>@mov.SaldoPosterior.ToString("N2")</td>
+                    <td>@mov.Responsavel</td>
+                    <td><small>@mov.Observacao</small></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (movimentos.Count == 0)
+{
+    <p class="text-muted">Nenhum movimento registrado.</p>
+}
+
+@code {
+    private List<MovimentoEstoque> movimentos = new();
+    private List<Insumo> insumos = new();
+    private string filtroInsumoId = "";
+    private bool exibirFormulario;
+    private CreateMovimento movForm = new();
+    private string? insumoSelecionado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarInsumos();
+
+        var query = NavigationManagerExt.GetQueryString(Navigation.Uri);
+        if (query.TryGetValue("insumoId", out var id))
+        {
+            filtroInsumoId = id;
+        }
+
+        await CarregarMovimentos();
+    }
+
+    private async Task OnFiltroChanged(ChangeEventArgs e)
+    {
+        filtroInsumoId = e.Value?.ToString() ?? "";
+        await CarregarMovimentos();
+    }
+
+    private void OnInsumoChanged(ChangeEventArgs e)
+    {
+        insumoSelecionado = e.Value?.ToString();
+    }
+
+    private async Task CarregarInsumos()
+    {
+        try { insumos = await Api.GetInsumosAsync(); }
+        catch { }
+    }
+
+    private async Task CarregarMovimentos()
+    {
+        Guid? insumoId = string.IsNullOrEmpty(filtroInsumoId) ? null : Guid.Parse(filtroInsumoId);
+        try { movimentos = await Api.GetMovimentosAsync(insumoId); }
+        catch { }
+    }
+
+    private void NovoMovimento()
+    {
+            movForm = new() { Quantidade = 1, Tipo = "Entrada" };
+            insumoSelecionado = null;
+            if (!string.IsNullOrEmpty(filtroInsumoId))
+                insumoSelecionado = filtroInsumoId;
+        exibirFormulario = true;
+    }
+
+    private async Task SalvarMovimento()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(insumoSelecionado)) return;
+            movForm.InsumoId = Guid.Parse(insumoSelecionado);
+            await Api.CreateMovimentoAsync(movForm);
+            exibirFormulario = false;
+            await CarregarMovimentos();
+            await CarregarInsumos();
+        }
+        catch { }
+    }
+
+    private static string TipoBadge(string tipo) => tipo switch
+    {
+        "Entrada" => "bg-success",
+        "Saida" => "bg-danger",
+        "Ajuste" => "bg-warning text-dark",
+        "Reserva" => "bg-info text-dark",
+        "Devolucao" => "bg-primary",
+        "Perda" => "bg-dark",
+        _ => "bg-secondary"
+    };
+}
+
+@using System.Web
+@code {
+    public static class NavigationManagerExt
+    {
+        public static Dictionary<string, string> GetQueryString(string uri)
+        {
+            var result = new Dictionary<string, string>();
+            if (uri.Contains('?'))
+            {
+                var query = uri[(uri.IndexOf('?') + 1)..];
+                foreach (var part in query.Split('&'))
+                {
+                    var eq = part.IndexOf('=');
+                    if (eq > 0)
+                    {
+                        var key = HttpUtility.UrlDecode(part[..eq]);
+                        var val = HttpUtility.UrlDecode(part[(eq + 1)..]);
+                        if (!string.IsNullOrEmpty(key)) result[key] = val;
+                    }
+                }
+            }
+            return result;
+        }
+    }
+}

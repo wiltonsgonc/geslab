@@ -1,0 +1,81 @@
+@page "/login"
+@rendermode InteractiveServer
+@using LabScheduler.Web.Models
+@inject Services.AuthService Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Login - Administração</PageTitle>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-header text-center">
+                <h4 class="mb-0">Acesso Administrativo</h4>
+            </div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(erro))
+                {
+                    <div class="alert alert-danger">@erro</div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label">Usuário</label>
+                    <InputText @bind-Value="username" class="form-control" placeholder="admin, lab ou viewer" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Senha</label>
+                    <input type="password" class="form-control" @bind="password" placeholder="lab123" @onkeydown="OnKeyDown" />
+                </div>
+                <button class="btn btn-primary w-100" @onclick="FazerLogin" disabled="@carregando">
+                    @(carregando ? "Entrando..." : "Entrar")
+                </button>
+
+                <hr />
+                <small class="text-muted d-block text-center">
+                    Credenciais de desenvolvimento:<br />
+                    admin / lab123 (Admin)<br />
+                    lab / lab123 (Técnico)<br />
+                    viewer / lab123 (Visualizador)
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string username = "admin";
+    private string password = "lab123";
+    private string? erro;
+    private bool carregando;
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await FazerLogin();
+    }
+
+    private async Task FazerLogin()
+    {
+        erro = null;
+        carregando = true;
+        try
+        {
+            var result = await Auth.LoginAsync(username, password);
+            if (result != null)
+            {
+                Navigation.NavigateTo("/admin");
+            }
+            else
+            {
+                erro = "Usuário ou senha inválidos.";
+            }
+        }
+        catch
+        {
+            erro = "Erro de conexão com o servidor.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
