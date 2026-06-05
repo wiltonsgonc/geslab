@@ -1,4 +1,4 @@
-# Multi-stage build for LabScheduler.Api
+# Multi-stage build for LabScheduler.Web
 
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
@@ -13,17 +13,16 @@ COPY src/LabScheduler.Web/LabScheduler.Web/*.csproj src/LabScheduler.Web/LabSche
 COPY src/LabScheduler.Web/LabScheduler.Web.Client/*.csproj src/LabScheduler.Web/LabScheduler.Web.Client/
 RUN dotnet restore
 
-# Copy everything and publish only the API
+# Copy everything and publish only the Web
 COPY . .
-RUN dotnet publish src/LabScheduler.Api/LabScheduler.Api.csproj -c Release -o /app
+RUN dotnet publish src/LabScheduler.Web/LabScheduler.Web/LabScheduler.Web.csproj -c Release -o /app
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
-EXPOSE 5000
-EXPOSE 5001
+EXPOSE 8002
 
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app .
-ENTRYPOINT ["dotnet", "LabScheduler.Api.dll"]
+ENTRYPOINT ["dotnet", "LabScheduler.Web.dll"]
