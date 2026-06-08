@@ -23,7 +23,11 @@ WORKDIR /app
 EXPOSE 5000
 EXPOSE 5001
 
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl --silent --fail http://localhost:5000/ || exit 1
 
 COPY --from=build /app .
+USER app
 ENTRYPOINT ["dotnet", "LabScheduler.Api.dll"]
