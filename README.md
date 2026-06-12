@@ -56,21 +56,50 @@ Rota: `http://localhost:8002/login`
 
 ## Como Executar
 
-### Com Podman
+### Docker (Ubuntu / Docker Desktop)
 
 ```bash
-# Clonar e acessar
-git clone <repo> lab
-cd lab
-
-# (opcional) Ajustar senhas no .env
-# SA_PASSWORD=LabScheduler@2024
-
 # Build e iniciar
+docker compose up -d --build
+```
+
+### Podman com systemd ativo (Debian/Ubuntu com systemd --user funcional)
+
+```bash
 podman compose up -d --build
 ```
 
-Serviços:
+### Podman sem systemd --user (Alma Linux no WSL2 / VPS sem PAM completo)
+
+**Passo 1 — Configurar o host** (executar UMA ÚNICA VEZ):
+
+```bash
+chmod +x scripts/setup-podman-rootless.sh
+./scripts/setup-podman-rootless.sh
+```
+
+O script desabilita aardvark-dns e pasta, que exigem D-Bus/systemd.
+
+**Passo 2 — Abrir NOVA sessão SSH** (para carregar as variáveis de ambiente):
+
+```bash
+source ~/.bashrc
+podman run --rm alpine echo ok   # teste
+```
+
+**Passo 3 — Iniciar o projeto**:
+
+```bash
+podman-compose up -d
+```
+
+Se o Passo 3 ainda falhar com erro de rede, use o **fallback com host networking**:
+
+```bash
+podman-compose -f docker-compose.yml -f docker-compose.podman.yml --env-file .env.podman up -d
+```
+
+Serviços (qualquer modo):
 | Serviço | Porta |
 |---|---|
 | SQL Server | `1433` |
@@ -92,6 +121,56 @@ dotnet run
 # Web (outro terminal)
 cd src/LabScheduler.Web/LabScheduler.Web
 dotnet run
+```
+
+## Troubleshooting
+
+### "aardvark-dns failed to start" + "pasta process" (Podman 5.x rootless)
+
+**Causa**: Podman 5.x usa `netavark`/`aardvark-dns` para DNS e `pasta` para rede
+rootless. Ambos exigem systemd --user (socket D-Bus em `/run/user/1000/bus`).
+No WSL2 ou VPS sem sessão `systemd --user`, esses sockets não existem.
+
+**Solução primária** — configurar o host (recomendado):
+
+```bash
+./scripts/setup-podman-rootless.sh
+# Abrir NOVA sessão
+podman-compose up -d
+```
+
+O script cria `~/.config/containers/containers.conf` com:
+- `dns_bind_port = 0` → desliga aardvark-dns (SEM isso o container não sobe)
+- `default_rootless_network_cmd = "slirp4netns"` → evita pasta
+- `cgroup_manager = "cgroupfs"` → evita cgroups via systemd
+
+**Solução fallback** — host networking (se o script não resolver):
+
+```bash
+podman-compose -f docker-compose.yml -f docker-compose.podman.yml --env-file .env.podman up -d
+```
+
+O `docker-compose.podman.yml` usa `network_mode: "host"`, que pula todo o
+stack netavark/aardvark/pasta. Os contêineres compartilham a rede do host.
+
+### "NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json"
+
+O `dotnet restore` falha durante o build por falta de DNS no contêiner build.
+O `build.network: host` no compose resolve isso. Se ainda falhar, execute o
+`setup-podman-rootless.sh` ou use o fallback `.podman.yml`.
+
+### "HEALTHCHECK is not supported for OCI image format"
+
+Apenas aviso — Podman usa formato OCI por padrão. O container funciona.
+
+### SQL Server não fica pronto (healthcheck timeout)
+
+SQL Server 2022 precisa de no mínimo 2 GB de RAM. Em WSL ou VPS com pouca memória:
+
+```bash
+# Aumentar memória do WSL2: crie %USERPROFILE%\.wslconfig
+[wsl2]
+memory=8GB
 ```
 
 ## API Endpoints
