@@ -1,0 +1,32 @@
+# Fallback para Podman rootless SEM systemd --user
+# Usa host networking para evitar netavark/aardvark-dns
+# Uso: podman-compose -f docker-compose.yml -f docker-compose.podman.yml --env-file .env.podman up -d
+
+services:
+  sqlserver:
+    network_mode: "host"
+    ports: []
+    healthcheck:
+      disable: true
+    depends_on: {}
+
+  api:
+    build:
+      network: host
+    network_mode: "host"
+    ports: []
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=LabScheduler;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
+    depends_on:
+      sqlserver:
+        condition: service_started
+
+  web:
+    build:
+      network: host
+    network_mode: "host"
+    ports: []
+    environment:
+      ApiBaseUrl: "http://localhost:5000"
+    depends_on:
+      - api
