@@ -6,6 +6,7 @@ WORKDIR /src
 
 # Copy all .csproj files so the solution restore works
 COPY *.slnx ./
+COPY NuGet.config ./
 COPY src/LabScheduler.Domain/*.csproj src/LabScheduler.Domain/
 COPY src/LabScheduler.Infrastructure/*.csproj src/LabScheduler.Infrastructure/
 COPY src/LabScheduler.Api/*.csproj src/LabScheduler.Api/
